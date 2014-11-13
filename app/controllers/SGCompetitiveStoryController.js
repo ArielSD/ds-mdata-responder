@@ -33,8 +33,6 @@ var SGCompetitiveStoryController = function(app) {
   this.gameModel = require('../models/sgCompetitiveStory')(app);
   this.userModel = require('../models/sgUser')(app);
   this.gameConfig = app.get('competitive-stories');
-  // comment out above, comment in below to enable testing with test-endgame-message.json
-  // this.gameConfig = app.get('test-endgame-message');
 };
 
 /**
@@ -61,8 +59,12 @@ SGCompetitiveStoryController.prototype.createGame = function(request, response) 
   }
 
   // Allows us to use the .findUserGame(obj, onUserGameFound) 
-  // helper function function. A bit hacky, mark for refactoring.
-  this.request = { body : {} };
+  // helper function function.
+  
+  this.request = request;
+  if (!this.request.body) {
+    this.request.body = {}
+  }
   this.request.body.phone = request.body.alpha_mobile;
 
   // Story ID could be in either POST or GET param.
@@ -330,13 +332,24 @@ function evaluateCondition(condition, phone, gameDoc, checkResultType) {
 SGCompetitiveStoryController.prototype.betaJoinGame = function(request, response) {
   if (typeof request.body === 'undefined'
       || typeof request.body.phone === 'undefined'
-      || typeof request.body.args === 'undefined') {
+      // Checking request.query.args because of the one-touch beta opt in mdata: http://goo.gl/Bh7Mxi
+      || (typeof request.body.args === 'undefined' && typeof request.query.args === 'undefined')) {
     response.send(406, '`phone` and `args` parameters required.');
     return false;
   }
 
-  // If beta doesn't respond with 'Y', then just ignore
-  if (!messageHelper.isYesResponse(messageHelper.getFirstWord(request.body.args))) {
+  // If beta doesn't respond with 'Y', then just ignore. Checks first for .args param on request.query.
+
+  var args;
+  // Specifying both in case request.query doesn't exist. 
+  if (request.query && request.query.args) {
+    args = request.query.args; 
+  }
+  else if (request.body.args) {
+    args = request.body.args;
+  }
+
+  if (!messageHelper.isYesResponse(messageHelper.getFirstWord(args))) {
     response.send();
   }
   else {
